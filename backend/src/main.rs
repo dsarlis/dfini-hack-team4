@@ -266,7 +266,20 @@ fn get_all_tasks() -> Vec<ShortTask> {
 
 #[query]
 fn get_balance() -> Amount {
-    0
+    let caller = caller();
+    let mut amount : u64 = 0;
+
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        if !ledger.contains_key(&caller) {
+            ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+        }
+        if let Some(amt) = ledger.get(&caller) {
+            amount = *amt
+        }
+    });
+
+    amount
 }
 
 #[update]
