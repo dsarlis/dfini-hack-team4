@@ -36,7 +36,7 @@ type Task = record {
   submitter: principal;
   task_type: TaskType;
   payload: TaskPayload;
-  deadline: Deadline,
+  deadline: Timestamp,
   reward: Reward,
   answers: vec Answer;
   status: TaskStatus,
