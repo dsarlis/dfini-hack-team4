@@ -1,5 +1,16 @@
 # dfini-hack-team4
 
+## Prerequisites
+Ensure that the following this are provided
+1. Rustup is installed
+```
+rustup update
+```
+2. Make sure the following target is added to rustup
+```
+rustup target add wasm32-unknown-unknown
+```
+
 ## Local Development
 
 After cloning the repository,
