@@ -51,9 +51,9 @@ type ShortTask = record {
 service : () -> {
   register: () -> ();
   submit_task : (TaskType, TaskPayload, Timestamp, Amount) -> (TaskId);
-  get_task: (TaskId) -> Task;
-  get_all_tasks: () -> Vec ShortTask;
-  get_balance: () -> Amount;
+  get_task: (TaskId) -> (Task) query;
+  get_all_tasks: () -> (Vec ShortTask) query;
+  get_balance: () -> (Amount) query;
   answer_task: (TaskId, Solution) -> (AnswerId);
   vote: (AnswerId, Choice) -> ();
 }
