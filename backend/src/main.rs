@@ -1,7 +1,13 @@
+use ic_cdk::api::caller;
 use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
 use ic_cdk_macros::{query, update};
 use serde_bytes::ByteBuf;
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
+
+const INITIAL_TOKENS: Amount = 1000;
 
 type AnswerId = u64;
 type Content = ByteBuf;
@@ -12,17 +18,17 @@ type Timestamp = u64;
 type Amount = u64;
 
 struct State {
-    _tasks: HashMap<TaskId, TaskInternal>,
-    _answers: HashMap<AnswerId, Answer>,
-    _ledger: HashMap<Principal, Amount>,
+    _tasks: RefCell<HashMap<TaskId, TaskInternal>>,
+    _answers: RefCell<HashMap<AnswerId, Answer>>,
+    ledger: RefCell<HashMap<Principal, Amount>>,
 }
 
 impl Default for State {
     fn default() -> Self {
         State {
-            _tasks: HashMap::default(),
-            _answers: HashMap::default(),
-            _ledger: HashMap::default(),
+            _tasks: RefCell::new(HashMap::default()),
+            _answers: RefCell::new(HashMap::default()),
+            ledger: RefCell::new(HashMap::default()),
         }
     }
 }
@@ -120,7 +126,17 @@ struct TaskInternal {
 }
 
 #[update]
-fn register() {}
+fn register() {
+    let caller = caller();
+
+    STATE.with(|s| {
+        let mut ledger = s.ledger.borrow_mut();
+        if ledger.contains_key(&caller) {
+            ic_cdk::trap(&format!("{} has already registered.", caller));
+        }
+        ledger.insert(caller, INITIAL_TOKENS);
+    });
+}
 
 #[update]
 fn submit_task(
