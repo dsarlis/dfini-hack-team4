@@ -13,12 +13,12 @@ type Language = variant {
     greek;
     hindi;
     italian;
-}
+};
 
 type TranslateTextInput = record {
     input: text;
     language: Language;
-}
+};
 
 type TaskType = variant {
   translate_text;
@@ -51,16 +51,16 @@ type Task = record {
   submitter: principal;
   task_type: TaskType;
   payload: TaskPayload;
-  deadline: Timestamp,
-  reward: Amount,
+  deadline: Timestamp;
+  reward: Amount;
   answers: vec Answer;
-  status: TaskStatus,
+  status: TaskStatus;
 };
 
 type ShortTask = record {
   id: TaskId;
   submitter: principal;
-  type: TaskType;
+  task_type: TaskType;
 };
 
 service : () -> {
@@ -69,7 +69,7 @@ service : () -> {
   // only supported input is `TranslateTextInput`.
   submit_task : (TaskType, TaskPayload, Duration, Amount) -> (TaskId);
   get_task: (TaskId) -> (Task) query;
-  get_all_tasks: () -> (Vec ShortTask) query;
+  get_all_tasks: () -> (vec ShortTask) query;
   get_balance: () -> (Amount) query;
   answer_task: (TaskId, Content) -> (AnswerId);
   vote: (AnswerId, Choice) -> ();
