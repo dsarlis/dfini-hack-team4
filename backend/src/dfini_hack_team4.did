@@ -1,0 +1,59 @@
+type Amount = nat64;
+type AnswerId = nat64;
+type Solution = blob;
+type TaskId = nat64;
+type TaskPayload = blob;
+type Timestamp = nat64;
+
+type TaskType = variant {
+  translate_text;
+  edit_image;
+};
+
+type TaskStatus = variant {
+  open;
+  closed;
+};
+
+type Choice = variant {
+  yes;
+  no;
+};
+
+type Vote = record {
+  voter: principal;
+  choice: Choice;
+};
+
+type Answer = record {
+  submitter: principal;
+  submission_time: Timestamp;
+  solution: Solution;
+  votes: vec Vote;
+};
+
+type Task = record {
+  submitter: principal;
+  type: TaskType;
+  payload: TaskPayload;
+  deadline: Deadline,
+  reward: Reward,
+  answers: vec Answer;
+  status: TaskStatus,
+};
+
+type ShortTask = record {
+  id: TaskId;
+  submitter: principal;
+  type: TaskType;
+};
+
+service : () -> {
+  register: () -> ();
+  submit_task : (TaskType, TaskPayload, Timestamp, Amount) -> (TaskId);
+  get_task: (TaskId) -> Task;
+  get_all_tasks: () -> Vec ShortTask;
+  get_balance: () -> Amount;
+  answer_task: (TaskId, Solution) -> (AnswerId);
+  vote: (AnswerId, Choice) -> ();
+}
