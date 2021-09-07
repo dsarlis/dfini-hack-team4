@@ -1,0 +1,49 @@
+name: Build canister
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-canister:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        rust: [ '1.51.0' ]
+        os: [ ubuntu-latest, macos-latest ]
+        dfx: [ '0.8.1' ]
+        start-flag: [ '', '--emulator' ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+
+      - name: Install DFX
+        run: |
+          export DFX_VERSION=${{ matrix.dfx }}
+          echo Install DFX Version: $DFX_VERSION
+          yes | sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Install Rust
+        run: |
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build canister
+        shell: bash
+        run: |
+          dfx start ${{ matrix.start-flag }} --background
+          dfx canister create dfini_hack_team4
+          dfx build
+          dfx stop
