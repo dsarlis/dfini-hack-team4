@@ -1,0 +1,23 @@
+{
+  "canisters": {
+    "dfini_hack_team4": {
+      "type": "custom",
+      "candid": "backend/src/dfini_hack_team4.did",
+      "wasm": "backend/target/wasm32-unknown-unknown/release/dfini_hack_team4.wasm",
+      "build": "backend/build.sh",
+      "source": ["dist"]
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}
