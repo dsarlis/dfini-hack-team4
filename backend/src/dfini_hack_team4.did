@@ -34,7 +34,7 @@ type Answer = record {
 
 type Task = record {
   submitter: principal;
-  type: TaskType;
+  task_type: TaskType;
   payload: TaskPayload;
   deadline: Deadline,
   reward: Reward,
