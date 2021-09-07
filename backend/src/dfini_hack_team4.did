@@ -1,9 +1,24 @@
 type Amount = nat64;
 type AnswerId = nat64;
-type Solution = blob;
+type Content = blob;
+type Duration = nat64;
 type TaskId = nat64;
 type TaskPayload = blob;
 type Timestamp = nat64;
+
+type Language = variant {
+    chinese;
+    french;    
+    german;
+    greek;
+    hindi;
+    italian;
+}
+
+type TranslateTextInput = record {
+    input: text;
+    language: Language;
+}
 
 type TaskType = variant {
   translate_text;
@@ -28,7 +43,7 @@ type Vote = record {
 type Answer = record {
   submitter: principal;
   submission_time: Timestamp;
-  solution: Solution;
+  content: Content;
   votes: vec Vote;
 };
 
@@ -50,10 +65,12 @@ type ShortTask = record {
 
 service : () -> {
   register: () -> ();
-  submit_task : (TaskType, TaskPayload, Timestamp, Amount) -> (TaskId);
+  // `TaskPayload` is a Candid encoded value of a task input. Currently, the
+  // only supported input is `TranslateTextInput`.
+  submit_task : (TaskType, TaskPayload, Duration, Amount) -> (TaskId);
   get_task: (TaskId) -> (Task) query;
   get_all_tasks: () -> (Vec ShortTask) query;
   get_balance: () -> (Amount) query;
-  answer_task: (TaskId, Solution) -> (AnswerId);
+  answer_task: (TaskId, Content) -> (AnswerId);
   vote: (AnswerId, Choice) -> ();
 }
