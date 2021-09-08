@@ -1,9 +1,9 @@
 {
   "canisters": {
-    "dfini_hack_team4": {
+    "ic_butler": {
       "type": "custom",
-      "candid": "backend/src/dfini_hack_team4.did",
-      "wasm": "backend/target/wasm32-unknown-unknown/release/dfini_hack_team4.wasm",
+      "candid": "backend/src/ic_butler.did",
+      "wasm": "backend/target/wasm32-unknown-unknown/release/ic_butler.wasm",
       "build": "backend/build.sh",
       "source": ["dist"]
     }

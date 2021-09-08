@@ -44,6 +44,6 @@ jobs:
         shell: bash
         run: |
           dfx start ${{ matrix.start-flag }} --background
-          dfx canister create dfini_hack_team4
+          dfx canister create ic_butler
           dfx build
           dfx stop
