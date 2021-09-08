@@ -131,6 +131,7 @@ struct ShortTask {
     id: TaskId,
     submitter: Principal,
     task_type: TaskType,
+    status: TaskStatus,
 }
 
 #[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
@@ -323,6 +324,7 @@ fn get_all_tasks() -> Vec<ShortTask> {
                 id: task_id_ref.clone(),
                 submitter: task_internal.submitter,
                 task_type: task_internal.task_type,
+                status: task_internal.status,
             })
         }
     });
@@ -539,7 +541,63 @@ fn retrieve_data() {
 }
 
 #[export_name = "canister_heartbeat"]
-fn hearbeat() {}
+fn hearbeat() {
+    STATE.with(|s| {
+        for (task_id, task) in s.tasks.borrow_mut().iter_mut().filter(|(_, t)| t.status == TaskStatus::Open) {
+            if task.deadline < time() {
+                task.status = TaskStatus::Closed;
+                let mut votes_exist = false;
+                let mut max_vote_diff = std::i64::MIN;
+                let mut submitter_for_top_voted_answer = Principal::anonymous();
+                let all_answers = s.answers.borrow();
+                let mut task_answers = vec![];
+                for answer_id in task.answers.iter() {
+                    match all_answers.get(answer_id) {
+                        // This is a case which should not occur, but let's catch it just to be sure
+                        None => { ic_cdk::trap(&format!(
+                            "The answer with ID {} was listed in task with ID {} even though there is no\
+                            such answer recorded.", answer_id, task_id)
+                        );}
+                        Some(answer) => {
+                            task_answers.push(answer);
+                        }
+                    }
+                }
+
+                task_answers.sort_by(|a, b| a.submission_time.cmp(&b.submission_time));
+
+                for answer in task_answers.iter() {
+                    let num_votes = answer.votes.len();
+                    if num_votes > 0 {
+                        votes_exist = true;
+                        let vote_diff = answer.votes
+                            .iter()
+                            .map(|v| match v.choice { Choice::Yes => 1, Choice::No => -1})
+                            .sum::<i64>();
+                        if vote_diff > max_vote_diff {
+                            max_vote_diff = vote_diff;
+                            submitter_for_top_voted_answer = answer.submitter;
+                        }
+                    }
+                }
+
+                // If votes exist, then the top voted answer gets the reward.
+                // Otherwise, it's returned to the task submitter.
+                let reward_principal = if votes_exist {
+                    submitter_for_top_voted_answer
+                } else {
+                    task.submitter
+                };
+                let mut ledger = s.ledger.borrow_mut();
+                match ledger.get_mut(&reward_principal) {
+                    Some(amount) => { *amount += task.reward; },
+                    // This should not happen, but handle it just in case.
+                    None => {ic_cdk::trap(&format!("Principal {} is not registered.", reward_principal));}
+                }
+            }
+        }
+    });
+}
 
 fn main() {}
 
