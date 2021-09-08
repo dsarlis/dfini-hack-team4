@@ -47,13 +47,18 @@ type Answer = record {
   votes: vec Vote;
 };
 
+type AnswerWithId = record {
+    AnswerId;
+    Answer;
+};
+
 type Task = record {
   submitter: principal;
   task_type: TaskType;
   payload: TaskPayload;
   deadline: Timestamp;
   reward: Amount;
-  answers: vec Answer;
+  answers: vec AnswerWithId;
   status: TaskStatus;
 };
 
