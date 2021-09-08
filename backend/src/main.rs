@@ -61,7 +61,7 @@ thread_local! {
     static STATE: State = State::default();
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 enum Choice {
     #[serde(rename = "yes")]
     Yes,
@@ -85,7 +85,7 @@ enum Language {
     Italian,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 enum TaskType {
     #[serde(rename = "translate_text")]
     TranslateText,
@@ -93,7 +93,7 @@ enum TaskType {
     EditImage,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 enum TaskStatus {
     #[serde(rename = "open")]
     Open,
@@ -107,14 +107,14 @@ struct TranslateTextInput {
     language: Language,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 struct Answer {
     submitter: Principal,
     submission_time: Timestamp,
     votes: Vec<Vote>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 struct Task {
     submitter: Principal,
     task_type: TaskType,
@@ -125,20 +125,20 @@ struct Task {
     status: TaskStatus,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 struct ShortTask {
     id: TaskId,
     submitter: Principal,
     task_type: TaskType,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
 struct Vote {
     voter: Principal,
     choice: Choice,
 }
 
-#[allow(dead_code)]
+#[derive(Clone)]
 struct TaskInternal {
     submitter: Principal,
     task_type: TaskType,
@@ -258,26 +258,90 @@ fn submit_task(
 }
 
 #[query]
-fn get_task(_id: TaskId) -> Task {
-    Task {
-        submitter: Principal::anonymous(),
-        task_type: TaskType::TranslateText,
-        payload: ByteBuf::from(vec![]),
-        deadline: 0,
-        reward: 0,
-        answers: vec![],
-        status: TaskStatus::Open,
-    }
+fn get_task(id: TaskId) -> Task {
+    let caller = caller();
+    get_task_impl(caller, id)
+}
+
+fn get_task_impl(caller: Principal, id: TaskId) -> Task {
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        if !ledger.contains_key(&caller) {
+            ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+        }
+        let task_map = s.tasks.borrow();
+        let answers_map = s.answers.borrow();
+        match task_map.get(&id) {
+            Some(task_internal_ref) => {
+                let task_internal: TaskInternal = (*task_internal_ref).clone();
+                let mut answers: Vec<Answer> = Vec::new();
+                for ans_id in task_internal.answers.iter() {
+                    match answers_map.get(ans_id) {
+                        Some(ans_ref) => {
+                            answers.push(ans_ref.clone());
+                        }
+                        None => {
+                            ic_cdk::trap(&format!(
+                                "Inconsistent state. AnswerId {} cannot be found",
+                                ans_id
+                            ));
+                        }
+                    }
+                }
+                Task {
+                    submitter: task_internal.submitter,
+                    task_type: task_internal.task_type,
+                    payload: task_internal.payload,
+                    deadline: task_internal.deadline,
+                    reward: task_internal.reward,
+                    answers,
+                    status: task_internal.status,
+                }
+            }
+            None => {
+                ic_cdk::trap(&format!("Requested task id {} cannot be found", id));
+            }
+        }
+    })
 }
 
 #[query]
 fn get_all_tasks() -> Vec<ShortTask> {
-    vec![]
+    let caller = caller();
+    let mut tasks = Vec::new();
+
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        if !ledger.contains_key(&caller) {
+            ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+        }
+        let task_map = s.tasks.borrow();
+        for (task_id_ref, task_internal_ref) in task_map.iter() {
+            let task_internal = (*task_internal_ref).clone();
+            tasks.push(ShortTask {
+                id: task_id_ref.clone(),
+                submitter: task_internal.submitter,
+                task_type: task_internal.task_type,
+            })
+        }
+    });
+
+    tasks
 }
 
 #[query]
 fn get_balance() -> Amount {
-    0
+    let caller = caller();
+
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        match ledger.get(&caller) {
+            Some(amount) => *amount,
+            None => {
+                ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+            }
+        }
+    })
 }
 
 #[update]
@@ -375,3 +439,182 @@ fn vote(_id: AnswerId, _choice: Choice) {}
 fn hearbeat() {}
 
 fn main() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_task() {
+        let principal1 =
+            Principal::from_text("ollzc-44u63-k7twc-5fffp-f5vr7-ptyb5-v6esl-cswqt-f4u4t-qfxbj-6ae")
+                .unwrap();
+        let principal2 =
+            Principal::from_text("etn6u-fsyqb-qmjjs-murc2-w4qtf-4tota-tp2vi-y5jau-kavt5-zi6dj-lae")
+                .unwrap();
+        let principal3 =
+            Principal::from_text("lv3pe-37kt2-3kbhe-r2oyg-ppn4z-mftmh-j242j-gu7ps-hvun5-3ioxb-3qe")
+                .unwrap();
+
+        let mut v = Vec::new();
+        v.push(Vote {
+            voter: Principal::anonymous(),
+            choice: Choice::Yes,
+        });
+        v.push(Vote {
+            voter: Principal::anonymous(),
+            choice: Choice::Yes,
+        });
+
+        let mut answers_map = HashMap::new();
+        let id = 1;
+        answers_map.insert(
+            id,
+            Answer {
+                submitter: principal1,
+                submission_time: 1631075074,
+                votes: v.clone(),
+            },
+        );
+        answers_map.insert(
+            id + 1,
+            Answer {
+                submitter: principal1,
+                submission_time: 1631075073,
+                votes: v.clone(),
+            },
+        );
+        answers_map.insert(
+            id + 2,
+            Answer {
+                submitter: principal2,
+                submission_time: 1631075074,
+                votes: v.clone(),
+            },
+        );
+        answers_map.insert(
+            id + 3,
+            Answer {
+                submitter: principal2,
+                submission_time: 1631075073,
+                votes: v.clone(),
+            },
+        );
+
+        //let mut tasks = HashMap::new();
+        let bytes: [u8; 7] = [65, 66, 67, 68, 69, 70, 71];
+        let mut ans_ids: HashSet<u64> = HashSet::new();
+        ans_ids.insert(1);
+        ans_ids.insert(2);
+        ans_ids.insert(3);
+        ans_ids.insert(4);
+
+        super::STATE.with(|s| {
+            //s.tasks = RefCell::new(tasks.clone());
+            //s.answers = RefCell::new(answers_map.clone());
+            //s.ledger = RefCell::new(ledger.clone());
+            let mut ledger = s.ledger.borrow_mut();
+            ledger.insert(principal1, 100);
+            ledger.insert(principal2, 200);
+
+            let mut answers_map = s.answers.borrow_mut();
+            answers_map.insert(
+                id,
+                Answer {
+                    submitter: principal1,
+                    submission_time: 1631075074,
+                    votes: v.clone(),
+                },
+            );
+            answers_map.insert(
+                id + 1,
+                Answer {
+                    submitter: principal1,
+                    submission_time: 1631075073,
+                    votes: v.clone(),
+                },
+            );
+            answers_map.insert(
+                id + 2,
+                Answer {
+                    submitter: principal2,
+                    submission_time: 1631075074,
+                    votes: v.clone(),
+                },
+            );
+            answers_map.insert(
+                id + 3,
+                Answer {
+                    submitter: principal2,
+                    submission_time: 1631075073,
+                    votes: v.clone(),
+                },
+            );
+
+            let mut tasks = s.tasks.borrow_mut();
+            tasks.insert(
+                id,
+                TaskInternal {
+                    submitter: principal1,
+                    task_type: TaskType::TranslateText,
+                    payload: ByteBuf::from(bytes),
+                    deadline: 1631075080,
+                    reward: 12,
+                    answers: ans_ids.clone(),
+                    status: TaskStatus::Open,
+                },
+            );
+            tasks.insert(
+                id + 1,
+                TaskInternal {
+                    submitter: principal1,
+                    task_type: TaskType::TranslateText,
+                    payload: ByteBuf::from(bytes),
+                    deadline: 1631075083,
+                    reward: 11,
+                    answers: ans_ids.clone(),
+                    status: TaskStatus::Open,
+                },
+            );
+            tasks.insert(
+                id + 2,
+                TaskInternal {
+                    submitter: principal2,
+                    task_type: TaskType::TranslateText,
+                    payload: ByteBuf::from(bytes),
+                    deadline: 1631075085,
+                    reward: 10,
+                    answers: ans_ids.clone(),
+                    status: TaskStatus::Open,
+                },
+            );
+        });
+
+        // Request from unregistered principal
+        let result = std::panic::catch_unwind(|| get_task_impl(principal3, 1));
+        assert!(result.is_err());
+
+        // Request for valid task
+        let mut answers: Vec<Answer> = Vec::new();
+        for ans_id in ans_ids {
+            if let Some(ans_ref) = answers_map.get(&ans_id) {
+                answers.push(ans_ref.clone());
+            }
+        }
+        let expected_result = Task {
+            submitter: principal1,
+            task_type: TaskType::TranslateText,
+            payload: ByteBuf::from(bytes),
+            deadline: 1631075080,
+            reward: 12,
+            answers,
+            status: TaskStatus::Open,
+        };
+        let result = get_task_impl(principal1, 1);
+        assert_eq!(result, expected_result);
+
+        // Request for invalid task
+        let result = std::panic::catch_unwind(|| get_task_impl(principal3, 10));
+        assert!(result.is_err());
+    }
+}
