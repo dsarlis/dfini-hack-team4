@@ -165,16 +165,18 @@ fn submit_task(
 
     STATE.with(|s| {
         let ledger = s.ledger.borrow();
-        if !ledger.contains_key(&caller) {
-            ic_cdk::trap(&format!("{} has not been registered yet.", caller));
-        }
-
-        let balance = *ledger.get(&caller).unwrap();
-        if balance < SUBMISSION_COST {
-            ic_cdk::trap(&format!(
-                "{} has only {} tokens but {} are needed to submit a task.",
-                caller, balance, SUBMISSION_COST
-            ));
+        match ledger.get(&caller) {
+            Some(balance) => {
+                if *balance < SUBMISSION_COST {
+                    ic_cdk::trap(&format!(
+                        "{} has only {} tokens but {} are needed to submit a task.",
+                        caller, balance, SUBMISSION_COST
+                    ));
+                }
+            }
+            None => {
+                ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+            }
         }
     });
 
@@ -210,6 +212,7 @@ fn submit_task(
 
             STATE.with(|s| {
                 let mut ledger = s.ledger.borrow_mut();
+                // Safe because we have checked that the caller is registered above.
                 let balance = *ledger.get(&caller).unwrap();
                 if balance < SUBMISSION_COST + reward {
                     ic_cdk::trap(&format!(
