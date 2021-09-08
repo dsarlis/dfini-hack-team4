@@ -190,14 +190,15 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
             ic_cdk::trap(&format!("Principal {} cannot provide an answer as this is not a registered\
              user on the ledger.", caller));
         }
+
     });
+
 
     STATE.with(|s| {
         let mut tasks = s.tasks.borrow_mut();
         let mut answers = s.answers.borrow_mut();
 
-        // Precondition: taskID exists
-        if let Some(task) = tasks.get(&task_id){
+        if let Some(task) = tasks.get_mut(&task_id) {
 
             // Precondition: there are less than max_answers for taskID
             if task.answers.len() > MAX_NUMBER_ANSWERS {
@@ -209,20 +210,22 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 
             // Precondition: the caller hasn’t submitted an answer for this task
             for answer_id in task.answers.iter() {
-                if let Some(answer) = answers.get(answer_id){
-                    if caller == answer.submitter {
+                match answers.get(answer_id){
+                    Some(answer) => {
+                        if caller == answer.submitter {
+                            ic_cdk::trap(&format!(
+                                "The principal {} already submitted an answer for the task with ID {}.",
+                                caller, task_id));
+                        }
+                    },
+                    // this is a case which should not occur, but let's catch it just to be sure
+                    None => {
                         ic_cdk::trap(&format!(
-                            "The principal {} already submitted an answer for the task with ID {}.",
-                            caller, task_id));
-                    }
-                } else {
-                    // this is a case which should not occurr, but let's catch it just to be sure
-                    ic_cdk::trap(&format!(
-                        "The answer with ID {} was listed in task with ID {} even though there is no\
+                            "The answer with ID {} was listed in task with ID {} even though there is no\
                     such answer recorded.",
-                        answer_id, task_id));
+                            answer_id, task_id));
+                    }
                 }
-
             }
 
             // Precondition: the deadline for the task has not expired
@@ -252,17 +255,14 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
                     votes: vec![],
                 },
             );
-
-            return answer_id;
+            answer_id
 
         } else { // the task ID does not exist
             ic_cdk::trap(&format!(
                 "Cannot provide an answer to task with ID {} as this task does not exist.",
                 task_id));
-            0
         }
-    });
-    0
+    })
 }
 
 #[update]
