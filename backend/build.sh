@@ -11,8 +11,8 @@ STATUS=$?
 
 if [ "$STATUS" -eq "0" ]; then
       "$BACKEND_DIR"/../target/bin/ic-cdk-optimizer \
-      "$BACKEND_DIR/target/$TARGET/release/dfini_hack_team4.wasm" \
-      -o "$BACKEND_DIR/target/$TARGET/release/dfini_hack_team4.wasm"
+      "$BACKEND_DIR/target/$TARGET/release/ic_butler.wasm" \
+      -o "$BACKEND_DIR/target/$TARGET/release/ic_butler.wasm"
 
   true
 else
