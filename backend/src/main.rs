@@ -1,13 +1,27 @@
 use ic_cdk::api::{caller, time};
-use ic_cdk::export::candid::{CandidType, Deserialize, Principal};
+use ic_cdk::export::candid::{CandidType, Decode, Deserialize, Principal};
 use ic_cdk_macros::{query, update};
 use serde_bytes::ByteBuf;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    convert::TryFrom,
 };
 
+// The initial amount of tokens given to a newly registered principal.
 const INITIAL_TOKENS: Amount = 1000;
+
+// The cost of submitting a task. The main purpose is to prevent DoS attacks.
+const SUBMISSION_COST: Amount = 1;
+
+// The minimum duration that a task can stay open.
+const MIN_DURATION: std::time::Duration = std::time::Duration::from_secs(60); // 1 minute
+
+// The maximum duration that a task can stay open.
+const MAX_DURATION: std::time::Duration = std::time::Duration::from_secs(60 * 60 * 24); // 1 day
+
+// The maximum size of the payload of a task.
+const MAX_TASK_PAYLOAD: usize = 10 * 1024; // 100 KiB
 
 // The maximum number of answers that can be provided per task.
 const MAX_NUMBER_ANSWERS: usize = 10;
@@ -24,6 +38,7 @@ type Timestamp = u64;
 type Amount = u64;
 
 struct State {
+    next_task_id: RefCell<TaskId>,
     tasks: RefCell<HashMap<TaskId, TaskInternal>>,
     answers: RefCell<HashMap<AnswerId, Answer>>,
     next_answer_id: RefCell<AnswerId>,
@@ -33,6 +48,7 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         State {
+            next_task_id: RefCell::new(0),
             tasks: RefCell::new(HashMap::default()),
             answers: RefCell::new(HashMap::default()),
             next_answer_id: RefCell::new(0),
@@ -148,12 +164,97 @@ fn register() {
 
 #[update]
 fn submit_task(
-    _task_type: TaskType,
-    _payload: TaskPayload,
-    _duration: Duration,
-    _reward: Amount,
+    task_type: TaskType,
+    payload: TaskPayload,
+    duration: Duration,
+    reward: Amount,
 ) -> TaskId {
-    0
+    let caller = caller();
+
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        match ledger.get(&caller) {
+            Some(balance) => {
+                if *balance < SUBMISSION_COST {
+                    ic_cdk::trap(&format!(
+                        "{} has only {} tokens but {} are needed to submit a task.",
+                        caller, balance, SUBMISSION_COST
+                    ));
+                }
+            }
+            None => {
+                ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+            }
+        }
+    });
+
+    match task_type {
+        TaskType::TranslateText => {
+            if payload.len() > MAX_TASK_PAYLOAD {
+                ic_cdk::trap(&format!(
+                    "Maximum size of payload is {} but {} was given.",
+                    MAX_TASK_PAYLOAD,
+                    payload.len()
+                ));
+            }
+
+            if let Err(err) = Decode!(&payload, TranslateTextInput) {
+                ic_cdk::trap(&format!("Invalid input for tranlating text: {}", err));
+            };
+
+            if duration < u64::try_from(MIN_DURATION.as_nanos()).unwrap() {
+                ic_cdk::trap(&format!(
+                    "Mininum duration for task is {:?}, but {:?} was given",
+                    MIN_DURATION,
+                    std::time::Duration::from_nanos(duration)
+                ));
+            }
+
+            if duration > u64::try_from(MAX_DURATION.as_nanos()).unwrap() {
+                ic_cdk::trap(&format!(
+                    "Maximum duration for task is {:?}, but {:?} was given",
+                    MAX_DURATION,
+                    std::time::Duration::from_nanos(duration)
+                ));
+            }
+
+            STATE.with(|s| {
+                let mut ledger = s.ledger.borrow_mut();
+                // Safe because we have checked that the caller is registered above.
+                let balance = *ledger.get(&caller).unwrap();
+                if balance < SUBMISSION_COST + reward {
+                    ic_cdk::trap(&format!(
+                        "{} has only {} tokens but {} were requested as a reward.",
+                        caller,
+                        balance - SUBMISSION_COST,
+                        reward
+                    ));
+                }
+                ledger.insert(caller, balance - SUBMISSION_COST - reward);
+            });
+
+            let task_id = STATE.with(|s| s.next_task_id.replace_with(|&mut old| old + 1));
+
+            STATE.with(|s| {
+                let mut tasks = s.tasks.borrow_mut();
+                tasks.insert(
+                    task_id,
+                    TaskInternal {
+                        submitter: caller,
+                        task_type,
+                        payload,
+                        deadline: time() + duration,
+                        reward,
+                        answers: HashSet::new(),
+                        status: TaskStatus::Open,
+                    },
+                );
+            });
+
+            task_id
+        }
+        TaskType::EditImage => ic_cdk::trap("Edit image use case is unimplemented!"),
+    }
 }
 
 #[query]
