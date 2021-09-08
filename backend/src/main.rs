@@ -1,6 +1,7 @@
 use ic_cdk::api::{caller, time};
 use ic_cdk::export::candid::{CandidType, Decode, Deserialize, Principal};
-use ic_cdk_macros::{query, update};
+use ic_cdk::storage::{stable_restore, stable_save};
+use ic_cdk_macros::{post_upgrade, pre_upgrade, query, update};
 use serde_bytes::ByteBuf;
 use std::{
     cell::RefCell,
@@ -138,7 +139,7 @@ struct Vote {
     choice: Choice,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, CandidType, Deserialize)]
 struct TaskInternal {
     submitter: Principal,
     task_type: TaskType,
@@ -496,6 +497,45 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) {
             }
         }
     });
+}
+
+#[pre_upgrade]
+fn save_data() {
+    STATE.with(|s| {
+        if let Err(err) = stable_save((
+            s.next_task_id.take(),
+            s.tasks.take(),
+            s.answers.take(),
+            s.next_answer_id.take(),
+            s.ledger.take(),
+        )) {
+            ic_cdk::trap(&format!("Could not store data to stable memory: {}", err));
+        }
+    });
+}
+
+#[post_upgrade]
+fn retrieve_data() {
+    match stable_restore::<(
+        TaskId,
+        HashMap<TaskId, TaskInternal>,
+        HashMap<AnswerId, Answer>,
+        AnswerId,
+        HashMap<Principal, Amount>,
+    )>() {
+        Ok((next_task_id, tasks, answers, next_answer_id, ledger)) => {
+            STATE.with(|s| {
+                s.next_task_id.replace(next_task_id);
+                s.tasks.replace(tasks);
+                s.answers.replace(answers);
+                s.next_answer_id.replace(next_answer_id);
+                s.ledger.replace(ledger);
+            });
+        }
+        Err(err) => {
+            ic_cdk::trap(&format!("Could not read data from stable memory: {}", err));
+        }
+    }
 }
 
 #[export_name = "canister_heartbeat"]
