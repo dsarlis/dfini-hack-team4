@@ -433,7 +433,7 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 }
 
 #[update]
-fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust the API accordingly
+fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) {
     let caller = caller();
     STATE.with(|s| {
         let ledger = s.ledger.borrow();
@@ -469,7 +469,7 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust t
                             ));
                         }
                         // Precondition: the task’s deadline has not been reached
-                        if task.deadline > time(){
+                        if task.deadline < time() {
                             ic_cdk::trap(&format!(
                                 "Cannot vote on answer with ID {} as the deadline of the corresponding\
                                 task has expired.",
@@ -477,28 +477,26 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust t
                             ));
                         }
                         // Precondition: the caller has not voted on this answer yet
-                        for existingVote in answer.votes.iter(){
-                            if existingVote.voter == caller {
+                        for existing_vote in answer.votes.iter() {
+                            if existing_vote.voter == caller {
                                 ic_cdk::trap(&format!(
-                                    "Princial {} has already voted on answer {}.",
+                                    "Principal {} has already voted on answer {}.",
                                     caller, answer_id
                                 ));
                             }
                         }
                         // At this point all the preconditions are met and we can update the vote
-                        let mut vote = Vote {
-                            voter:caller,
-                            choice:choice
+                        let vote = Vote {
+                            voter: caller,
+                            choice,
                         };
-                        answer.votes.append(vote);
+                        answer.votes.push(vote);
                     }
                 }
             }
         }
     });
 }
-
-
 
 #[export_name = "canister_heartbeat"]
 fn hearbeat() {}
