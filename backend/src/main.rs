@@ -10,10 +10,10 @@ use std::{
 const INITIAL_TOKENS: Amount = 1000;
 
 // The maximum number of answers that can be provided per task.
-const MAX_NUMBER_ANSWERS: usize = 10; // TODO: or should we use amount only for token amounts?
+const MAX_NUMBER_ANSWERS: usize = 10;
 
-// The maximum size of a solution to a task
-const MAX_SOLUTION_SIZE: usize = 10 * 1024; // 100 KiB
+// The maximum size of an answer's content.
+const MAX_CONTENT_SIZE: usize = 10 * 1024; // 100 KiB
 
 type AnswerId = u64;
 type Content = ByteBuf;
@@ -187,86 +187,88 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 
         // Precondition: caller is a principal on the ledger
         if !ledger.contains_key(&caller) {
-            ic_cdk::trap(&format!("Principal {} cannot provide an answer as this is not a registered\
-             user on the ledger.", caller));
+            ic_cdk::trap(&format!(
+                "Principal {} cannot provide an answer as this is not a registered\
+             user on the ledger.",
+                caller
+            ));
         }
-
     });
-
 
     STATE.with(|s| {
         let mut tasks = s.tasks.borrow_mut();
         let mut answers = s.answers.borrow_mut();
 
-        if let Some(task) = tasks.get_mut(&task_id) {
-
-            // Precondition: there are less than max_answers for taskID
-            if task.answers.len() > MAX_NUMBER_ANSWERS {
+        match tasks.get_mut(&task_id) {
+            // the task ID does not exist
+            None => {
                 ic_cdk::trap(&format!(
-                    "Cannot provide an answer to task {} as the maximum number of {} answers is already \
-                reached.",
-                    task_id, MAX_NUMBER_ANSWERS));
-            }
-
-            // Precondition: the caller hasn’t submitted an answer for this task
-            for answer_id in task.answers.iter() {
-                match answers.get(answer_id){
-                    Some(answer) => {
-                        if caller == answer.submitter {
-                            ic_cdk::trap(&format!(
-                                "The principal {} already submitted an answer for the task with ID {}.",
-                                caller, task_id));
-                        }
-                    },
-                    // this is a case which should not occur, but let's catch it just to be sure
-                    None => {
-                        ic_cdk::trap(&format!(
-                            "The answer with ID {} was listed in task with ID {} even though there is no\
-                    such answer recorded.",
-                            answer_id, task_id));
-                    }
-                }
-            }
-
-            // Precondition: the deadline for the task has not expired
-            if task.deadline < time() {
-                ic_cdk::trap(&format!(
-                    "No new solution can be provided as the deadline for the task {} has already expired.",
+                    "Cannot provide an answer to task with ID {} as this task does not exist.",
                     task_id));
             }
+            Some(task) => {
+                // Precondition: there are less than max_answers for taskID
+                if task.answers.len() >= MAX_NUMBER_ANSWERS {
+                    ic_cdk::trap(&format!(
+                        "Cannot provide an answer to task {} as the maximum number of {} answers is already \
+                    reached.",
+                        task_id, MAX_NUMBER_ANSWERS));
+                }
 
-            // Precondition: the solution's size is less than max_solution_size
-            if content.len() > MAX_SOLUTION_SIZE {
-                ic_cdk::trap(&format!(
-                    "Maximum size of solution is {} but {} was given.",
-                    MAX_SOLUTION_SIZE, content.len()
-                ));
+                // Precondition: the deadline for the task has not expired
+                if task.deadline < time() {
+                    ic_cdk::trap(&format!(
+                        "No new solution can be provided as the deadline for the task {} has already expired.",
+                        task_id));
+                }
+
+                // Precondition: the solution's size is less than MAX_CONTENT_SIZE
+                if content.len() > MAX_CONTENT_SIZE {
+                    ic_cdk::trap(&format!(
+                        "Maximum size of solution is {} but {} was given.",
+                        MAX_CONTENT_SIZE, content.len()
+                    ));
+                }
+
+                // Precondition: the caller hasn’t submitted an answer for this task
+                for answer_id in task.answers.iter() {
+                    match answers.get(answer_id){
+                        Some(answer) => {
+                            if caller == answer.submitter {
+                                ic_cdk::trap(&format!(
+                                    "The principal {} already submitted an answer for the task with ID {}.",
+                                    caller, task_id));
+                            }
+                        },
+                        // this is a case which should not occur, but let's catch it just to be sure
+                        None => {
+                            ic_cdk::trap(&format!(
+                                "The answer with ID {} was listed in task with ID {} even though there is no\
+                        such answer recorded.",
+                                answer_id, task_id));
+                        }
+                    }
+                }
+
+                // Now that all the preconditions are met, make the new answer and submit it
+                let answer_id = s.next_answer_id.replace_with(|&mut old| old + 1);
+                task.answers.insert(answer_id);
+                answers.insert(
+                    answer_id,
+                    Answer {
+                        submitter: caller,
+                        submission_time: time(),
+                        votes: vec![],
+                    },
+                );
+                answer_id
             }
-
-            // Now that all the preconditions are met, make the new answer and submit it
-            let answer_id = s.next_answer_id.replace_with(|&mut old| old + 1);
-            // let answer =             }
-            task.answers.insert(answer_id);
-            answers.insert(
-                answer_id,
-                Answer {
-                    submitter: caller,
-                    submission_time: time(),
-                    votes: vec![],
-                },
-            );
-            answer_id
-
-        } else { // the task ID does not exist
-            ic_cdk::trap(&format!(
-                "Cannot provide an answer to task with ID {} as this task does not exist.",
-                task_id));
         }
     })
 }
 
 #[update]
-fn vote(answer_id: AnswerId, choice: Choice) { }
+fn vote(_answer_id: AnswerId, _choice: Choice) {}
 
 #[export_name = "canister_heartbeat"]
 fn hearbeat() {}
