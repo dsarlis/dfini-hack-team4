@@ -1,4 +1,4 @@
-# dfini-hack-team4
+# ic-butler
 
 ## Prerequisites
 Ensure that the following are provided
