@@ -266,42 +266,7 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 }
 
 #[update]
-fn vote(answer_id: AnswerId, choice: Choice) {
-    let caller = caller();
-    STATE.with(|s| {
-        let ledger = s.ledger.borrow();
-        let mut answers = s.answers.borrow_mut();
-
-        // Precondition: caller is a principal on the ledger
-        if !ledger.contains_key(&caller) {
-            ic_cdk::trap(&format!("Principal {} cannot provide an answer as this is not a registered\
-             user on the ledger.", caller));
-        }
-
-        // Precondition: the answerID exists
-        match answers.get_mut(answer_id) {
-            None => {
-                ic_cdk::trap(&format!(
-                    "Principal {} cannot vote on answer with ID {} as this answer does not exist.",
-                    caller, answer_id);
-            },
-            Some(answer) => {
-
-            }
-        }
-
-
-    });
-/*
-struct Answer {
-    submitter: Principal,
-    submission_time: Timestamp,
-    votes: Vec<Vote>,
-}
-
-
- */
-}
+fn vote(answer_id: AnswerId, choice: Choice) { }
 
 #[export_name = "canister_heartbeat"]
 fn hearbeat() {}
