@@ -61,6 +61,7 @@ type ShortTask = record {
   id: TaskId;
   submitter: principal;
   task_type: TaskType;
+  status: TaskStatus;
 };
 
 service : () -> {
