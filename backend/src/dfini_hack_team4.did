@@ -72,5 +72,5 @@ service : () -> {
   get_all_tasks: () -> (vec ShortTask) query;
   get_balance: () -> (Amount) query;
   answer_task: (TaskId, Content) -> (AnswerId);
-  vote: (AnswerId, Choice) -> ();
+  vote: (AnswerId, TaskId, Choice) -> ();
 }

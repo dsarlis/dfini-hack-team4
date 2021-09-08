@@ -433,7 +433,70 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 }
 
 #[update]
-fn vote(_id: AnswerId, _choice: Choice) {}
+fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) {
+    let caller = caller();
+    STATE.with(|s| {
+        let ledger = s.ledger.borrow();
+        let mut answers = s.answers.borrow_mut();
+        let mut tasks = s.tasks.borrow_mut();
+
+        // Precondition: caller is a principal on the ledger
+        if !ledger.contains_key(&caller) {
+            ic_cdk::trap(&format!("Principal {} cannot provide an answer as this is not a registered\
+             user on the ledger.", caller));
+        }
+        match answers.get_mut(&answer_id) {
+            // Precondition: the answerID exists
+            None => {
+                ic_cdk::trap(&format!(
+                    "Principal {} cannot vote on answer with ID {} as this answer does not exist.",
+                    caller, answer_id));
+            },
+            Some(answer) => {
+                match tasks.get_mut(&task_id) {
+                    // Precondition: the taskID exists
+                    None => {
+                        ic_cdk::trap(&format!(
+                            "Principal {} cannot vote on task with ID {} as this task does not exist.",
+                            caller, task_id));
+                    },
+                    Some(task) => {
+                        // Precondition: answerID is an answer for the given task
+                        if !task.answers.contains(&answer_id){
+                            ic_cdk::trap(&format!(
+                                "The answer with ID {} is not an answer for task with ID {}.",
+                                answer_id, task_id
+                            ));
+                        }
+                        // Precondition: the task’s deadline has not been reached
+                        if task.deadline < time() {
+                            ic_cdk::trap(&format!(
+                                "Cannot vote on answer with ID {} as the deadline of the corresponding\
+                                task has expired.",
+                                answer_id
+                            ));
+                        }
+                        // Precondition: the caller has not voted on this answer yet
+                        for existing_vote in answer.votes.iter() {
+                            if existing_vote.voter == caller {
+                                ic_cdk::trap(&format!(
+                                    "Principal {} has already voted on answer {}.",
+                                    caller, answer_id
+                                ));
+                            }
+                        }
+                        // At this point all the preconditions are met and we can update the vote
+                        let vote = Vote {
+                            voter: caller,
+                            choice,
+                        };
+                        answer.votes.push(vote);
+                    }
+                }
+            }
+        }
+    });
+}
 
 #[export_name = "canister_heartbeat"]
 fn hearbeat() {}

@@ -64,3 +64,7 @@ You can answer a task by:
 dfx canister --no-wallet call dfini_hack_team4 answer_task '(0, blob "Hallo, welt")'
 ```
 
+You can vote on an answer by:
+```bash
+dfx canister --no-wallet call dfini_hack_team4 vote '(0, 0, variant {yes})'
+```
