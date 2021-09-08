@@ -59,3 +59,8 @@ And finally call submit_task where `bytes` is the output of the above command:
 dfx canister --no-wallet call dfini_hack_team4 submit_task '(variant {translate_text}, blob "bytes", 120000000000, 10)'
 ```
 
+You can answer a task by:
+```bash
+dfx canister --no-wallet call dfini_hack_team4 answer_task '(0, blob "Hallo, welt")'
+```
+
