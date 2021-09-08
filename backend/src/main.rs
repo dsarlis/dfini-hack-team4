@@ -369,7 +369,7 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
 }
 
 #[update]
-fn vote(_answer_id: AnswerId, _choice: Choice) {}
+fn vote(_id: AnswerId, _choice: Choice) {}
 
 #[export_name = "canister_heartbeat"]
 fn hearbeat() {}
