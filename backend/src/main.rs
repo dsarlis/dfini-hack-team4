@@ -138,7 +138,6 @@ struct Vote {
     choice: Choice,
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct TaskInternal {
     submitter: Principal,
@@ -265,16 +264,6 @@ fn get_task(id: TaskId) -> Task {
 }
 
 fn get_task_impl(caller: Principal, id: TaskId) -> Task {
-    let mut task: Task = Task {
-        submitter: Principal::anonymous(),
-        task_type: TaskType::TranslateText,
-        payload: ByteBuf::from(vec![]),
-        deadline: 0,
-        reward: 0,
-        answers: vec![],
-        status: TaskStatus::Open,
-    };
-
     STATE.with(|s| {
         let ledger = s.ledger.borrow();
         if !ledger.contains_key(&caller) {
@@ -299,7 +288,7 @@ fn get_task_impl(caller: Principal, id: TaskId) -> Task {
                         }
                     }
                 }
-                task = Task {
+                Task {
                     submitter: task_internal.submitter,
                     task_type: task_internal.task_type,
                     payload: task_internal.payload,
@@ -307,14 +296,13 @@ fn get_task_impl(caller: Principal, id: TaskId) -> Task {
                     reward: task_internal.reward,
                     answers,
                     status: task_internal.status,
-                };
+                }
             }
             None => {
                 ic_cdk::trap(&format!("Requested task id {} cannot be found", id));
             }
         }
-    });
-    task
+    })
 }
 
 #[query]
