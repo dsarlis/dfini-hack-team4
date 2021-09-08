@@ -281,33 +281,37 @@ fn get_task_impl(caller: Principal, id: TaskId) -> Task {
             ic_cdk::trap(&format!("{} has not been registered yet.", caller));
         }
         let task_map = s.tasks.borrow();
-        if !task_map.contains_key(&id) {
-            ic_cdk::trap(&format!("Requested task id {} cannot be found", id));
-        }
         let answers_map = s.answers.borrow();
-        if let Some(task_internal_ref) = task_map.get(&id) {
-            let task_internal: TaskInternal = (*task_internal_ref).clone();
-            let mut answers: Vec<Answer> = Vec::new();
-            for ans_id in task_internal.answers {
-                if !answers_map.contains_key(&ans_id) {
-                    ic_cdk::trap(&format!(
-                        "Inconsistent state. AnswerId {} cannot be found",
-                        ans_id
-                    ));
+        match task_map.get(&id) {
+            Some(task_internal_ref) => {
+                let task_internal: TaskInternal = (*task_internal_ref).clone();
+                let mut answers: Vec<Answer> = Vec::new();
+                for ans_id in task_internal.answers.iter() {
+                    match answers_map.get(ans_id) {
+                        Some(ans_ref) => {
+                            answers.push(ans_ref.clone());
+                        }
+                        None => {
+                            ic_cdk::trap(&format!(
+                                "Inconsistent state. AnswerId {} cannot be found",
+                                ans_id
+                            ));
+                        }
+                    }
                 }
-                if let Some(ans_ref) = answers_map.get(&ans_id) {
-                    answers.push(ans_ref.clone());
-                }
+                task = Task {
+                    submitter: task_internal.submitter,
+                    task_type: task_internal.task_type,
+                    payload: task_internal.payload,
+                    deadline: task_internal.deadline,
+                    reward: task_internal.reward,
+                    answers,
+                    status: task_internal.status,
+                };
             }
-            task = Task {
-                submitter: task_internal.submitter,
-                task_type: task_internal.task_type,
-                payload: task_internal.payload,
-                deadline: task_internal.deadline,
-                reward: task_internal.reward,
-                answers,
-                status: task_internal.status,
-            };
+            None => {
+                ic_cdk::trap(&format!("Requested task id {} cannot be found", id));
+            }
         }
     });
     task
@@ -340,19 +344,16 @@ fn get_all_tasks() -> Vec<ShortTask> {
 #[query]
 fn get_balance() -> Amount {
     let caller = caller();
-    let mut amount: u64 = 0;
 
     STATE.with(|s| {
         let ledger = s.ledger.borrow();
-        if !ledger.contains_key(&caller) {
-            ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+        match ledger.get(&caller) {
+            Some(amount) => *amount,
+            None => {
+                ic_cdk::trap(&format!("{} has not been registered yet.", caller));
+            }
         }
-        if let Some(amt) = ledger.get(&caller) {
-            amount = *amt
-        }
-    });
-
-    amount
+    })
 }
 
 #[update]
