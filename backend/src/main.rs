@@ -290,28 +290,28 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust t
             ic_cdk::trap(&format!("Principal {} cannot provide an answer as this is not a registered\
              user on the ledger.", caller));
         }
-        match answers.get_mut(answer_id) {
+        match answers.get_mut(&answer_id) {
             // Precondition: the answerID exists
             None => {
                 ic_cdk::trap(&format!(
                     "Principal {} cannot vote on answer with ID {} as this answer does not exist.",
-                    caller, answer_id);
+                    caller, answer_id));
             },
             Some(answer) => {
-                match tasks.get_mut(task_id) {
+                match tasks.get_mut(&task_id) {
                     // Precondition: the taskID exists
                     None => {
                         ic_cdk::trap(&format!(
                             "Principal {} cannot vote on task with ID {} as this task does not exist.",
-                            caller, task_id);
+                            caller, task_id));
                     },
                     Some(task) => {
                         // Precondition: answerID is an answer for the given task
-                        if !task.answers.contains(answer_id){
+                        if !task.answers.contains(&answer_id){
                             ic_cdk::trap(&format!(
                                 "The answer with ID {} is not an answer for task with ID {}.",
                                 answer_id, task_id
-                            );
+                            ));
                         }
                         // Precondition: the task’s deadline has not been reached
                         if task.deadline > time(){
@@ -319,7 +319,7 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust t
                                 "Cannot vote on answer with ID {} as the deadline of the corresponding\
                                 task has expired.",
                                 answer_id
-                            );
+                            ));
                         }
                         // Precondition: the caller has not voted on this answer yet
                         for existingVote in answer.votes.iter(){
@@ -327,16 +327,15 @@ fn vote(answer_id: AnswerId, task_id: TaskId, choice: Choice) { //TODO: adjust t
                                 ic_cdk::trap(&format!(
                                     "Princial {} has already voted on answer {}.",
                                     caller, answer_id
-                                );
+                                ));
                             }
                         }
                         // At this point all the preconditions are met and we can update the vote
-                        answer.votes.insert(
-                            Vote {
-                                voter: caller,
-                                choice: choice
-                            }
-                        )
+                        let mut vote = Vote {
+                            voter:caller,
+                            choice:choice
+                        };
+                        answer.votes.append(vote);
                     }
                 }
             }
