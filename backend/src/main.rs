@@ -122,7 +122,7 @@ struct Task {
     payload: TaskPayload,
     deadline: Timestamp,
     reward: Amount,
-    answers: Vec<Answer>,
+    answers: Vec<(AnswerId, Answer)>,
     status: TaskStatus,
 }
 
@@ -276,11 +276,11 @@ fn get_task_impl(caller: Principal, id: TaskId) -> Task {
         match task_map.get(&id) {
             Some(task_internal_ref) => {
                 let task_internal: TaskInternal = (*task_internal_ref).clone();
-                let mut answers: Vec<Answer> = Vec::new();
+                let mut answers = Vec::new();
                 for ans_id in task_internal.answers.iter() {
                     match answers_map.get(ans_id) {
                         Some(ans_ref) => {
-                            answers.push(ans_ref.clone());
+                            answers.push((*ans_id, ans_ref.clone()));
                         }
                         None => {
                             ic_cdk::trap(&format!(
@@ -756,10 +756,10 @@ mod tests {
         assert!(result.is_err());
 
         // Request for valid task
-        let mut answers: Vec<Answer> = Vec::new();
+        let mut answers = Vec::new();
         for ans_id in ans_ids {
             if let Some(ans_ref) = answers_map.get(&ans_id) {
-                answers.push(ans_ref.clone());
+                answers.push((ans_id, ans_ref.clone()));
             }
         }
         let expected_result = Task {
