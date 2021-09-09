@@ -112,6 +112,7 @@ struct TranslateTextInput {
 struct Answer {
     submitter: Principal,
     submission_time: Timestamp,
+    content: Content,
     votes: Vec<Vote>,
 }
 
@@ -122,7 +123,7 @@ struct Task {
     payload: TaskPayload,
     deadline: Timestamp,
     reward: Amount,
-    answers: Vec<(AnswerId, Answer)>,
+    answers: Vec<AnswerWithId>,
     status: TaskStatus,
 }
 
@@ -150,6 +151,13 @@ struct TaskInternal {
     answers: HashSet<AnswerId>,
     status: TaskStatus,
 }
+
+#[derive(Clone, Debug, PartialEq, CandidType, Deserialize)]
+struct AnswerWithId {
+    answer_id: AnswerId,
+    answer: Answer,
+}
+
 
 #[update]
 fn register() {
@@ -280,7 +288,10 @@ fn get_task_impl(caller: Principal, id: TaskId) -> Task {
                 for ans_id in task_internal.answers.iter() {
                     match answers_map.get(ans_id) {
                         Some(ans_ref) => {
-                            answers.push((*ans_id, ans_ref.clone()));
+                            answers.push(AnswerWithId{
+                                answer_id: *ans_id,
+                                answer: (*ans_ref).clone(),
+                            })
                         }
                         None => {
                             ic_cdk::trap(&format!(
@@ -426,6 +437,7 @@ fn answer_task(task_id: TaskId, content: Content) -> AnswerId {
                     Answer {
                         submitter: caller,
                         submission_time: time(),
+                        content,
                         votes: vec![],
                     },
                 );
@@ -617,6 +629,7 @@ mod tests {
             Principal::from_text("lv3pe-37kt2-3kbhe-r2oyg-ppn4z-mftmh-j242j-gu7ps-hvun5-3ioxb-3qe")
                 .unwrap();
 
+        let bytes: [u8; 7] = [65, 66, 67, 68, 69, 70, 71];
         let mut v = Vec::new();
         v.push(Vote {
             voter: Principal::anonymous(),
@@ -634,6 +647,7 @@ mod tests {
             Answer {
                 submitter: principal1,
                 submission_time: 1631075074,
+                content: ByteBuf::from(bytes),
                 votes: v.clone(),
             },
         );
@@ -642,6 +656,7 @@ mod tests {
             Answer {
                 submitter: principal1,
                 submission_time: 1631075073,
+                content: ByteBuf::from(bytes),
                 votes: v.clone(),
             },
         );
@@ -650,6 +665,7 @@ mod tests {
             Answer {
                 submitter: principal2,
                 submission_time: 1631075074,
+                content: ByteBuf::from(bytes),
                 votes: v.clone(),
             },
         );
@@ -658,12 +674,12 @@ mod tests {
             Answer {
                 submitter: principal2,
                 submission_time: 1631075073,
+                content: ByteBuf::from(bytes),
                 votes: v.clone(),
             },
         );
 
         //let mut tasks = HashMap::new();
-        let bytes: [u8; 7] = [65, 66, 67, 68, 69, 70, 71];
         let mut ans_ids: HashSet<u64> = HashSet::new();
         ans_ids.insert(1);
         ans_ids.insert(2);
@@ -684,6 +700,7 @@ mod tests {
                 Answer {
                     submitter: principal1,
                     submission_time: 1631075074,
+                    content: ByteBuf::from(bytes),
                     votes: v.clone(),
                 },
             );
@@ -692,6 +709,7 @@ mod tests {
                 Answer {
                     submitter: principal1,
                     submission_time: 1631075073,
+                    content: ByteBuf::from(bytes),
                     votes: v.clone(),
                 },
             );
@@ -700,6 +718,7 @@ mod tests {
                 Answer {
                     submitter: principal2,
                     submission_time: 1631075074,
+                    content: ByteBuf::from(bytes),
                     votes: v.clone(),
                 },
             );
@@ -708,6 +727,7 @@ mod tests {
                 Answer {
                     submitter: principal2,
                     submission_time: 1631075073,
+                    content: ByteBuf::from(bytes),
                     votes: v.clone(),
                 },
             );
@@ -759,7 +779,10 @@ mod tests {
         let mut answers = Vec::new();
         for ans_id in ans_ids {
             if let Some(ans_ref) = answers_map.get(&ans_id) {
-                answers.push((ans_id, ans_ref.clone()));
+                answers.push(AnswerWithId{
+                    answer_id: ans_id,
+                    answer: ans_ref.clone(),
+                });
             }
         }
         let expected_result = Task {
