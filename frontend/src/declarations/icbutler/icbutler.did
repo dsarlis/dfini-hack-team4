@@ -1,0 +1,13 @@
+type DfTask = 
+ record {
+   description: text;
+   id: nat;
+ };
+service : {
+  addDfTask: (text) -> (text);
+  addTask: (text) -> (text);
+  getDfTask: (nat) -> (DfTask);
+  getDfTaskList: () -> (vec DfTask);
+  getTaskList: () -> (vec text);
+  greet: (text) -> (text);
+}
