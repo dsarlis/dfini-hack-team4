@@ -48,18 +48,18 @@ type Answer = record {
 };
 
 type AnswerWithId = record {
-    AnswerId;
-    Answer;
+    answer_id: AnswerId;
+    answer: Answer;
 };
 
 type Task = record {
-  submitter: principal;
-  task_type: TaskType;
-  payload: TaskPayload;
-  deadline: Timestamp;
-  reward: Amount;
-  answers: vec AnswerWithId;
-  status: TaskStatus;
+    submitter: principal;
+    task_type: TaskType;
+    payload: TaskPayload;
+    deadline: Timestamp;
+    reward: Amount;
+    answers: vec AnswerWithId;
+    status: TaskStatus;
 };
 
 type ShortTask = record {
