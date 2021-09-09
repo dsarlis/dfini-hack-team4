@@ -1,0 +1,35 @@
+{
+  "canisters": {
+    "icbutler": {
+      "main": "src/icbutler/main.mo",
+      "type": "motoko"
+    },
+    "icbutler_assets": {
+      "dependencies": [
+        "icbutler"
+      ],
+      "frontend": {
+        "entrypoint": "src/icbutler_assets/src/index.html"
+      },
+      "source": [
+        "src/icbutler_assets/assets",
+        "dist/icbutler_assets/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "dfx": "0.8.0",
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}
